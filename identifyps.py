@@ -2,21 +2,23 @@
 #[VERSION: JUNE 1, 2020]
 #[ACKNOWLEDGEMENTS:]
     #[UNDERLYING FRAMEWORK PROVIDED BY PRIYA DWIVEDI]
-    #[CORRESPONDING ARTICLE: https://towardsdatascience.com/find-where-to-park-in-real-time-using-opencv-and-tensorflow-4307a4c3da03]
+    #[HER CORRESPONDING ARTICLE: https://towardsdatascience.com/find-where-to-park-in-real-time-using-opencv-and-tensorflow-4307a4c3da03]
 #-----------------------------------------
 
+#[PACKAGE IMPORTS]
 from __future__ import division
 import matplotlib.pyplot as plt
 import cv2
 import os, glob
 import numpy as np
+
+#[PRE-PROCESSING DIRECTIVES]
 cwd = os.getcwd()
 
-#[DISPLAYS IMAGES IN SUCCESSION]
-def show_images(images, cmap=None):
+#[HELPER FUNCTION TO DISPLAY IMAGES BEFORE/AFTER PROCESSING]
+def show_images(images, cmap = None):
     cols = 2
     rows = (len(images)+1)
-
     plt.figure(figsize=(15,12))
     for i, image in enumerate(images):
             plt.subplot(rows, cols, i+1)
@@ -26,12 +28,11 @@ def show_images(images, cmap=None):
             plt.yticks([])
     plt.tight_layout(pad=0, h_pad=0, w_pad=0)
     plt.show()
-
 test_images = [plt.imread(path) for path in glob.glob('test_images/*.jpg')]
 show_images(test_images)
 
-#[GENERAL COMMENTS: OPENCV USED TO SOLVE IMAGE PROCESSING ISSUES]
-#[SPECIFICS: IMAGE MASKING USED TO CLEAR IMAGE UP FOR LATER DATA PROCESSING]
+#[GENERAL COMMENT: OPENCV LIBRARY USED TO SOLVE IMAGE PROCESSING ISSUES]
+#[SPECIFICS: IMAGE MASKING USED TO EMPHASIZE IMAGE CONTRAST FOR LATER DATA PROCESSING]
 def select_rgb(image):
     lower = np.uint8([120,120,120])
     upper = np.uint8([255,255,255])
@@ -42,31 +43,29 @@ def select_rgb(image):
     mask = cv2.bitwise_or(white_mask, yellow_mask)
     masked = cv2.bitwise_and(image, image, mask = mask)
     return masked
-
 white_yellow_images = list(map(select_rgb, test_images))
 show_images(white_yellow_images)
 
 def convert_gray_scale(image):
     return cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-
 gray_images = list(map(convert_gray_scale, white_yellow_images))
 show_images(gray_images)
 
 def detect_edges(image, low_threshold=50, high_threshold=200):
     return cv2.Canny(image, low_threshold, high_threshold)
-
 edge_images = list(map(lambda image: detect_edges(image), gray_images))
 show_images(edge_images)
 
-#[REMOVE EDGE NOISE]
+#[OVERARCHING FUNCTION TO REMOVE EDGE/BACKGROUND NOISE]
 def filter_region(image, vertices):
     mask = np.zeros_like(image)
-    if (len(mask.shape)==2):
+    if (len(mask.shape) == 2):
         cv2.fillPoly(mask, vertices, 255)
     else:
         cv2.fillPoly(mask, vertices, (255,)*mask.shape[2])
     return cv2.bitwise_and(image, mask)
 
+#[CREATING POLYGON FOR PARKING LOT]
 def select_region(image):
      rows, cols = image.shape[:2]
      pt_1  = [cols*0.05, rows*0.90]
@@ -77,17 +76,16 @@ def select_region(image):
      pt_6 = [cols*0.90, rows*0.90]
      vertices = np.array([[pt_1, pt_2, pt_3, pt_4, pt_5, pt_6]], dtype=np.int32)
      return filter_region(image, vertices)
-
 roi_images = list(map(select_region, edge_images))
 show_images(roi_images)
 
+
 def hough_lines(image):
     return cv2.HoughLinesP(image, rho=0.1, theta=np.pi/10, threshold=15, minLineLength=9, maxLineGap=4)
-
 list_of_lines = list(map(hough_lines, roi_images))
 
-def draw_lines(image, lines, color=[255, 0, 0], thickness=2, make_copy=True):
-    # the lines returned by cv2.HoughLinesP has the shape (-1, 1, 4)
+#[MAKE COPY OF IMAGE WITH LINES DRAWN]
+def draw_lines(image, lines, color=[255, 0, 0], thickness=2, make_copy = True):
     if make_copy:
         image = np.copy(image) # don't want to modify the original
     cleaned = []
@@ -96,47 +94,39 @@ def draw_lines(image, lines, color=[255, 0, 0], thickness=2, make_copy=True):
             if abs(y2-y1) <=1 and abs(x2-x1) >=25 and abs(x2-x1) <= 55:
                 cleaned.append((x1,y1,x2,y2))
                 cv2.line(image, (x1, y1), (x2, y2), color, thickness)
-    print(" No lines detected: ", len(cleaned))
     return image
-
 
 line_images = []
 for image, lines in zip(test_images, list_of_lines):
     line_images.append(draw_lines(image, lines))
-    
 show_images(line_images)
 
+#[CREATE LIST OF LINES]
 def identify_blocks(image, lines, make_copy=True):
     if make_copy:
         new_image = np.copy(image)
-    #Step 1: Create a clean list of lines
     cleaned = []
     for line in lines:
         for x1,y1,x2,y2 in line:
             if abs(y2-y1) <=1 and abs(x2-x1) >=25 and abs(x2-x1) <= 55:
                 cleaned.append((x1,y1,x2,y2))
-    
-    #Step 2: Sort cleaned by x1 position
     import operator
     list1 = sorted(cleaned, key=operator.itemgetter(0, 1))
     
-    #Step 3: Find clusters of x1 close together - clust_dist apart
+    
     clusters = {}
     dIndex = 0
     clus_dist = 10
 
     for i in range(len(list1) - 1):
         distance = abs(list1[i+1][0] - list1[i][0])
-    #         print(distance)
         if distance <= clus_dist:
             if not dIndex in clusters.keys(): clusters[dIndex] = []
             clusters[dIndex].append(list1[i])
             clusters[dIndex].append(list1[i + 1])
-
         else:
             dIndex += 1
     
-    #Step 4: Identify coordinates of rectangle around this cluster
     rects = {}
     i = 0
     for key in clusters:
@@ -146,7 +136,6 @@ def identify_blocks(image, lines, make_copy=True):
             cleaned = sorted(cleaned, key=lambda tup: tup[1])
             avg_y1 = cleaned[0][1]
             avg_y2 = cleaned[-1][1]
-    #         print(avg_y1, avg_y2)
             avg_x1 = 0
             avg_x2 = 0
             for tup in cleaned:
@@ -157,17 +146,13 @@ def identify_blocks(image, lines, make_copy=True):
             rects[i] = (avg_x1, avg_y1, avg_x2, avg_y2)
             i += 1
     
-    print("Num Parking Lanes: ", len(rects))
-    #Step 5: Draw the rectangles on the image
     buff = 7
     for key in rects:
         tup_topLeft = (int(rects[key][0] - buff), int(rects[key][1]))
         tup_botRight = (int(rects[key][2] + buff), int(rects[key][3]))
-#         print(tup_topLeft, tup_botRight)
         cv2.rectangle(new_image, tup_topLeft,tup_botRight,(0,255,0),3)
     return new_image, rects
-
-# images showing the region of interest only
+     
 rect_images = []
 rect_coords = []
 for image, lines in zip(test_images, list_of_lines):
@@ -177,11 +162,12 @@ for image, lines in zip(test_images, list_of_lines):
     
 show_images(rect_images)
 
+#[DRAW PARKING]
 def draw_parking(image, rects, make_copy = True, color=[255, 0, 0], thickness=2, save = True):
     if make_copy:
         new_image = np.copy(image)
     gap = 15.5
-    spot_dict = {} # maps each parking ID to its coords
+    spot_dict = {} 
     tot_spots = 0
     adj_y1 = {0: 20, 1:-10, 2:0, 3:-11, 4:28, 5:5, 6:-15, 7:-15, 8:-10, 9:-30, 10:9, 11:-32}
     adj_y2 = {0: 30, 1: 50, 2:15, 3:10, 4:-15, 5:15, 6:15, 7:-20, 8:15, 9:15, 10:0, 11:30}
@@ -189,7 +175,6 @@ def draw_parking(image, rects, make_copy = True, color=[255, 0, 0], thickness=2,
     adj_x1 = {0: -8, 1:-15, 2:-15, 3:-15, 4:-15, 5:-15, 6:-15, 7:-15, 8:-10, 9:-10, 10:-10, 11:0}
     adj_x2 = {0: 0, 1: 15, 2:15, 3:15, 4:15, 5:15, 6:15, 7:15, 8:10, 9:10, 10:10, 11:0}
     for key in rects:
-        # Horizontal lines
         tup = rects[key]
         x1 = int(tup[0]+ adj_x1[key])
         x2 = int(tup[2]+ adj_x2[key])
@@ -201,16 +186,12 @@ def draw_parking(image, rects, make_copy = True, color=[255, 0, 0], thickness=2,
             y = int(y1 + i*gap)
             cv2.line(new_image, (x1, y), (x2, y), color, thickness)
         if key > 0 and key < len(rects) -1 :        
-            #draw vertical lines
             x = int((x1 + x2)/2)
             cv2.line(new_image, (x, y1), (x, y2), color, thickness)
-        # Add up spots in this lane
         if key == 0 or key == (len(rects) -1):
             tot_spots += num_splits +1
         else:
             tot_spots += 2*(num_splits +1)
-            
-        # Dictionary of spot positions
         if key == 0 or key == (len(rects) -1):
             for i in range(0, num_splits+1):
                 cur_len = len(spot_dict)
@@ -224,7 +205,6 @@ def draw_parking(image, rects, make_copy = True, color=[255, 0, 0], thickness=2,
                 spot_dict[(x1, y, x, y+gap)] = cur_len +1
                 spot_dict[(x, y, x2, y+gap)] = cur_len +2   
     
-    print("total parking spaces: ", tot_spots, cur_len)
     if save:
         filename = 'with_parking.jpg'
         cv2.imwrite(filename, new_image)
@@ -238,10 +218,8 @@ for image, rects in zip(test_images, rect_coords):
     spot_pos.append(spot_dict)
     
 show_images(delineated)
-
 final_spot_dict = spot_pos[1]
-
-print(len(final_spot_dict))
+print("TOTAL NUMBER OF SPOTS: ", len(final_spot_dict))
 
 def assign_spots_map(image, spot_dict=final_spot_dict, make_copy = True, color=[255, 0, 0], thickness=2):
     if make_copy:
