@@ -58,15 +58,14 @@ def define_verts(image):
 def hough_transformation(image):
     return cv2.HoughLinesP(image, rho=0.1, theta=np.pi/10, threshold=15, minLineLength=9, maxLineGap=4)
 
-def draw_hough_transformation(image, lines, color=[0, 0, 255], thickness=2, make_copy=True):
+def draw_hough_transformation_withxclustering(image, lines, color=[0, 0, 255], thickness=2, make_copy=True):
     image = np.copy(image) # don't want to modify the original
     cleaned = []
     for line in lines:
         for x1,y1,x2,y2 in line:
             if abs(y2-y1) <=1 and abs(x2-x1) >=25 and abs(x2-x1) <= 55:
                 cleaned.append((x1,y1,x2,y2))
-                cv2.line(image, (x1, y1), (x2, y2), color, thickness)
-    return image
+
 
 test_images = [plt.imread(path) for path in glob.glob('test_images/*.jpg')]
 edge_images = list(map(lambda image: filter_rgb_and_edge_detection(image), test_images))
