@@ -1,7 +1,7 @@
 #[AUTHOR: RAHUL MEHTA]
 #[ALPHA VERSION: JUNE 1, 2020]
 #[ACKNOWLEDGEMENTS:]
-    #[UNDERLYING FRAMEWORK PROVIDED BY PRIYA DWIVEDI]
+    #[FRAMEWORK PROVIDED BY PRIYA DWIVEDI]
     #[HER CORRESPONDING ARTICLE: https://towardsdatascience.com/find-where-to-park-in-real-time-using-opencv-and-tensorflow-4307a4c3da03]
 #-----------------------------------------
 
@@ -49,12 +49,14 @@ def select_rgb(image):
 white_yellow_images = list(map(select_rgb, test_images))
 show_images(white_yellow_images)
 
+#[CONVERT TO GRAY SCALE]
 def convert_gray_scale(image):
     return cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
 gray_images = list(map(convert_gray_scale, white_yellow_images))
 show_images(gray_images)
 
+#[EDGE DETECTION]
 def detect_edges(image, low_threshold=50, high_threshold=200):
     return cv2.Canny(image, low_threshold, high_threshold)
 
@@ -81,11 +83,14 @@ def select_region(image):
      pt_6 = [cols*0.90, rows*0.90]
      vertices = np.array([[pt_1, pt_2, pt_3, pt_4, pt_5, pt_6]], dtype=np.int32)
      return filter_region(image, vertices)
+
 roi_images = list(map(select_region, edge_images))
 show_images(roi_images)
 
+#[HOUGH LINE TRANSFORMATION]
 def hough_lines(image):
     return cv2.HoughLinesP(image, rho=0.1, theta=np.pi/10, threshold=15, minLineLength=9, maxLineGap=4)
+
 list_of_lines = list(map(hough_lines, roi_images))
 
 #[MAKE COPY OF IMAGE WITH LINES DRAWN]
@@ -115,11 +120,9 @@ def identify_blocks(image, lines, make_copy=True):
             if abs(y2-y1) <=1 and abs(x2-x1) >=25 and abs(x2-x1) <= 55:
                 cleaned.append((x1,y1,x2,y2))
     list1 = sorted(cleaned, key=operator.itemgetter(0, 1))
-    
     clusters = {}
     dIndex = 0
     clus_dist = 10
-
     for i in range(len(list1) - 1):
         distance = abs(list1[i+1][0] - list1[i][0])
         if distance <= clus_dist:
@@ -128,7 +131,6 @@ def identify_blocks(image, lines, make_copy=True):
             clusters[dIndex].append(list1[i + 1])
         else:
             dIndex += 1
-    
     rects = {}
     i = 0
     for key in clusters:
@@ -147,21 +149,19 @@ def identify_blocks(image, lines, make_copy=True):
             avg_x2 = avg_x2/len(cleaned)
             rects[i] = (avg_x1, avg_y1, avg_x2, avg_y2)
             i += 1
-    
     buff = 7
     for key in rects:
         tup_topLeft = (int(rects[key][0] - buff), int(rects[key][1]))
         tup_botRight = (int(rects[key][2] + buff), int(rects[key][3]))
         cv2.rectangle(new_image, tup_topLeft,tup_botRight,(0,255,0),3)
     return new_image, rects
-     
+
 rect_images = []
 rect_coords = []
 for image, lines in zip(test_images, list_of_lines):
     new_image, rects = identify_blocks(image, lines)
     rect_images.append(new_image)
     rect_coords.append(rects)
-    
 show_images(rect_images)
 
 #[DRAW PARKING]
