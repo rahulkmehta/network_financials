@@ -59,21 +59,62 @@ def hough_transformation(image):
     return cv2.HoughLinesP(image, rho=0.1, theta=np.pi/10, threshold=15, minLineLength=9, maxLineGap=4)
 
 def draw_hough_transformation_withxclustering(image, lines, color=[0, 0, 255], thickness=2, make_copy=True):
-    image = np.copy(image) # don't want to modify the original
+    new_image = np.copy(image) # don't want to modify the original
     cleaned = []
     for line in lines:
         for x1,y1,x2,y2 in line:
             if abs(y2-y1) <=1 and abs(x2-x1) >=25 and abs(x2-x1) <= 55:
                 cleaned.append((x1,y1,x2,y2))
+    xlist = sorted(cleaned, key=operator.itemgetter(0,1))
+    clusters = {}
+    dIndex = 0
+    
+    #[NOTICE: FOR NOW, THIS IS A HARD-CODED VALUE -- MUST BE CHANGED TO MAKE ALGO ADAPTABLE TO DIFFERING SCOPES]
+    clust_dist = 10
+    #[END NOTICE]
 
+    for i in range(len(xlist)-1):
+        distance = abs(xlist[i+1][0]-xlist[i][0])
+        if distance <= clust_dist:
+            if not dIndex in clusters.keys(): 
+                clusters[dIndex] = []
+            clusters[dIndex].append(xlist[i])
+            clusters[dIndex].append(xlist[i+1])
+        else:
+            dIndex += 1
+    rects = {}
+    i = 0
+    for key in clusters:
+        all_list = clusters[key]
+        cleaned = list(set(all_list))
+        if len(cleaned) > 5:
+            cleaned = sorted(cleaned, key=lambda tup: tup[1])
+            avg_y1 = cleaned[0][1]
+            avg_y2 = cleaned[-1][1]
+            avg_x1 = 0
+            avg_x2 = 0
+            for tup in cleaned:
+                avg_x1 += tup[0]
+                avg_x2 += tup[2]
+            avg_x1 = avg_x1/len(cleaned)
+            avg_x2 = avg_x2/len(cleaned)
+            rects[i] = (avg_x1, avg_y1, avg_x2, avg_y2)
+            i += 1
+    buff = 7
+    for key in rects:
+        tup_topLeft = (int(rects[key][0] - buff), int(rects[key][1]))
+        tup_botRight = (int(rects[key][2] + buff), int(rects[key][3]))
+        cv2.rectangle(new_image, tup_topLeft,tup_botRight,(0,255,0),3)
+    return new_image, rects
 
 test_images = [plt.imread(path) for path in glob.glob('test_images/*.jpg')]
 edge_images = list(map(lambda image: filter_rgb_and_edge_detection(image), test_images))
 masked_images = list(map(define_verts, edge_images))
 list_of_lines = list(map(hough_transformation, masked_images))
-
-line_images = []
+rect_images = []
+rect_coords = []
 for image, lines in zip(test_images, list_of_lines):
-    line_images.append(draw_hough_transformation(image, lines))
-
-display_images(line_images)
+    new_image, rects = draw_hough_transformation_withxclustering(image, lines)
+    rect_images.append(new_image)
+    rect_coords.append(rects)    
+display_images(rect_images)
