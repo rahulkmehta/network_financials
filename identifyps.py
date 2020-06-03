@@ -1,5 +1,5 @@
 #[AUTHOR: RAHUL MEHTA]
-#[VERSION: JUNE 1, 2020]
+#[ALPHA VERSION: JUNE 1, 2020]
 #[ACKNOWLEDGEMENTS:]
     #[UNDERLYING FRAMEWORK PROVIDED BY PRIYA DWIVEDI]
     #[HER CORRESPONDING ARTICLE: https://towardsdatascience.com/find-where-to-park-in-real-time-using-opencv-and-tensorflow-4307a4c3da03]
@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 import cv2
 import os, glob
 import numpy as np
+import pickle
+import operator
 
 #[PRE-PROCESSING DIRECTIVES]
 cwd = os.getcwd()
@@ -43,16 +45,19 @@ def select_rgb(image):
     mask = cv2.bitwise_or(white_mask, yellow_mask)
     masked = cv2.bitwise_and(image, image, mask = mask)
     return masked
+
 white_yellow_images = list(map(select_rgb, test_images))
 show_images(white_yellow_images)
 
 def convert_gray_scale(image):
     return cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+
 gray_images = list(map(convert_gray_scale, white_yellow_images))
 show_images(gray_images)
 
 def detect_edges(image, low_threshold=50, high_threshold=200):
     return cv2.Canny(image, low_threshold, high_threshold)
+
 edge_images = list(map(lambda image: detect_edges(image), gray_images))
 show_images(edge_images)
 
@@ -79,7 +84,6 @@ def select_region(image):
 roi_images = list(map(select_region, edge_images))
 show_images(roi_images)
 
-
 def hough_lines(image):
     return cv2.HoughLinesP(image, rho=0.1, theta=np.pi/10, threshold=15, minLineLength=9, maxLineGap=4)
 list_of_lines = list(map(hough_lines, roi_images))
@@ -87,7 +91,7 @@ list_of_lines = list(map(hough_lines, roi_images))
 #[MAKE COPY OF IMAGE WITH LINES DRAWN]
 def draw_lines(image, lines, color=[255, 0, 0], thickness=2, make_copy = True):
     if make_copy:
-        image = np.copy(image) # don't want to modify the original
+        image = np.copy(image)
     cleaned = []
     for line in lines:
         for x1,y1,x2,y2 in line:
@@ -110,9 +114,7 @@ def identify_blocks(image, lines, make_copy=True):
         for x1,y1,x2,y2 in line:
             if abs(y2-y1) <=1 and abs(x2-x1) >=25 and abs(x2-x1) <= 55:
                 cleaned.append((x1,y1,x2,y2))
-    import operator
     list1 = sorted(cleaned, key=operator.itemgetter(0, 1))
-    
     
     clusters = {}
     dIndex = 0
@@ -170,8 +172,7 @@ def draw_parking(image, rects, make_copy = True, color=[255, 0, 0], thickness=2,
     spot_dict = {} 
     tot_spots = 0
     adj_y1 = {0: 20, 1:-10, 2:0, 3:-11, 4:28, 5:5, 6:-15, 7:-15, 8:-10, 9:-30, 10:9, 11:-32}
-    adj_y2 = {0: 30, 1: 50, 2:15, 3:10, 4:-15, 5:15, 6:15, 7:-20, 8:15, 9:15, 10:0, 11:30}
-    
+    adj_y2 = {0: 30, 1: 50, 2:15, 3:10, 4:-15, 5:15, 6:15, 7:-20, 8:15, 9:15, 10:0, 11:30}    
     adj_x1 = {0: -8, 1:-15, 2:-15, 3:-15, 4:-15, 5:-15, 6:-15, 7:-15, 8:-10, 9:-10, 10:-10, 11:0}
     adj_x2 = {0: 0, 1: 15, 2:15, 3:15, 4:15, 5:15, 6:15, 7:15, 8:10, 9:10, 10:10, 11:0}
     for key in rects:
@@ -204,7 +205,6 @@ def draw_parking(image, rects, make_copy = True, color=[255, 0, 0], thickness=2,
                 x = int((x1 + x2)/2)
                 spot_dict[(x1, y, x, y+gap)] = cur_len +1
                 spot_dict[(x, y, x2, y+gap)] = cur_len +2   
-    
     if save:
         filename = 'with_parking.jpg'
         cv2.imwrite(filename, new_image)
@@ -231,3 +231,19 @@ def assign_spots_map(image, spot_dict=final_spot_dict, make_copy = True, color=[
 
 marked_spot_images = list(map(assign_spots_map, test_images))
 show_images(marked_spot_images)
+
+with open('spot_dict.pickle', 'wb') as handle:
+    pickle.dump(final_spot_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+def save_for_cnn(image, spot_dict = final_spot_dict, folder_name ='for_cnn'):
+    for spot in spot_dict.keys():
+        (x1, y1, x2, y2) = spot
+        (x1, y1, x2, y2) = (int(x1), int(y1), int(x2), int(y2))
+        spot_img = image[y1:y2, x1:x2]
+        spot_img = cv2.resize(spot_img, (0,0), fx=2.0, fy=2.0) 
+        spot_id = spot_dict[spot]
+        filename = 'spot' + str(spot_id) +'.jpg'
+        cv2.imwrite(os.path.join(folder_name, filename), spot_img)
+
+save_for_cnn(test_images[0])
+
