@@ -107,14 +107,17 @@ def draw_hough_transformation_withxclustering(image, lines, color=[0, 0, 255], t
         cv2.rectangle(new_image, tup_topLeft,tup_botRight,(0,255,0),3)
     return new_image, rects
 
-test_images = [plt.imread(path) for path in glob.glob('test_images/*.jpg')]
-edge_images = list(map(lambda image: filter_rgb_and_edge_detection(image), test_images))
-masked_images = list(map(define_verts, edge_images))
-list_of_lines = list(map(hough_transformation, masked_images))
-rect_images = []
-rect_coords = []
-for image, lines in zip(test_images, list_of_lines):
-    new_image, rects = draw_hough_transformation_withxclustering(image, lines)
-    rect_images.append(new_image)
-    rect_coords.append(rects)    
-display_images(rect_images)
+def test_main():
+    test_images = [plt.imread(path) for path in glob.glob('test_images/*.jpg')]
+    edge_images = list(map(lambda image: filter_rgb_and_edge_detection(image), test_images))
+    masked_images = list(map(define_verts, edge_images))
+    list_of_lines = list(map(hough_transformation, masked_images))
+    rect_images = []
+    rect_coords = []
+    for image, lines in zip(test_images, list_of_lines):
+        new_image, rects = draw_hough_transformation_withxclustering(image, lines)
+        rect_images.append(new_image)
+        rect_coords.append(rects)    
+    display_images(rect_images)
+
+test_main()
