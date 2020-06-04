@@ -10,6 +10,9 @@ import os, glob
 import numpy as np
 import pickle
 import operator
+import jenkspy
+from sklearn.cluster import MeanShift, estimate_bandwidth
+from numpy import array, linspace
 
 #[PRE-PROCESSING DIRECTIVES]
 cwd = os.getcwd()
@@ -48,18 +51,34 @@ def draw_hough_transformation(image, lines, color=[255, 0, 0], thickness=2):
         for x1,y1,x2,y2 in line:
             if abs(y2-y1) <=1 and abs(x2-x1) >=25 and abs(x2-x1) <= 55:
                 cleaned.append((x1,y1,x2,y2))
+                print ((x1, x2))
                 cv2.line(image, (x1, y1), (x2, y2), color, thickness)
     return image
 
+#[COMPILE LIST OF LINE COORDINATES]
 def parse_datapoints(lines):
     datapoints = []
     for line in lines:
-        for x1, y1, x2, y2 in line:
-            datapoints.append((x1, y1, x2, y2))
+        for x1,y1,x2,y2 in line:
+            datapoints.append((x1 + x2)/2)
     return datapoints
 
+#[USE MEAN-SHIFT CLUSTERING AS NUMBER OF CLUSTERS DO NOT NEED TO BE KNOWN BEFORE-HAND]
 def find_clusters(lines):
-    print (lines)
+    #print (sorted(lines))
+    raw_lines = np.reshape(lines, (-1, 1))
+    band = estimate_bandwidth(raw_lines, quantile=0.2, n_samples=100)
+    ms = MeanShift(bandwidth = band, bin_seeding=True)
+    ms.fit(raw_lines)
+    labels = ms.labels_
+    cluster_centers = ms.cluster_centers_
+    print (cluster_centers)
+
+
+
+
+
+
 
 def draw_hough_transformation_withxclustering(image, lines, color=[0, 0, 255], thickness=2, make_copy=True):
     new_image = np.copy(image) # don't want to modify the original
@@ -164,14 +183,14 @@ def assign(image, spot_dict, make_copy = True, color = [0, 0, 255], thickness = 
 def test_main():
     test_images = [plt.imread(path) for path in glob.glob('test_images/*.jpg')]
     edge_images = list(map(lambda image: filter_rgb_and_edge_detection(image), test_images))
+    #display_images(edge_images)
     list_of_lines = list(map(hough_transformation, edge_images))
     line_images = []
     for image, lines in zip(test_images, list_of_lines):
       line_images.append(draw_hough_transformation(image, lines))    
     datapoints = parse_datapoints(lines)
-    clustered = find_clusters(datapoints)
-    #display_images(line_images)
-
+    find_clusters(datapoints)
+    display_images(line_images)
 
     #################3
     # rect_images = []
