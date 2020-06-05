@@ -1,18 +1,27 @@
-#[AUTHOR: RAHUL MEHTA]
-#[ALPHA VERSION: JUNE 1, 2020]
-#[METHODOLOGY DRAWN FROM OPEN-SOURCES LISTED IN ACKNOWLEDGEMENTS. IMPROVEMENTS & CHANGES LISTED IN README.md]
+############################################################################
+# File Name: objectvision.py                                               #
+#                                                                          #
+# Developer: Rahul Mehta                                                   #
+#                                                                          #
+# Designer: Debi Prasad Sahoo, Anshul Prakash Deshkar, Rahul Mehta         #
+#                                                                          #
+# (c)2016-2020 Copyright Protected,NetworkFinancials Inc.,San Jose(CA),USA #
+#                                                                          #
+############################################################################
+
+#[METHODOLOGY DRAWN FROM OPEN-SOURCES & PAPERS LISTED IN ACKNOWLEDGEMENTS. IMPROVEMENTS & CHANGES ALSO LISTED IN README.md]
 
 #[PACKAGE IMPORTS]
 from __future__ import division
-import matplotlib.pyplot as plt
 import cv2
+import pickle
+import decimal
+import operator
 import os, glob
 import numpy as np
-import pickle
-import operator
-import jenkspy
-from sklearn.cluster import MeanShift, estimate_bandwidth
 from numpy import array, linspace
+import matplotlib.pyplot as plt
+from sklearn.cluster import MeanShift, estimate_bandwidth
 
 #[PRE-PROCESSING DIRECTIVES]
 cwd = os.getcwd()
@@ -37,21 +46,37 @@ def filter_rgb_and_edge_detection(image, lt = 50, ht = 200):
     (thresh, blackAndWhiteImage) = cv2.threshold(grayImage, 137, 255, cv2.THRESH_BINARY)
     return cv2.Canny(blackAndWhiteImage, lt, ht)
 
-#[NOTE: THE EDGE DETECTION NEEDED TO BE DONE BEFORE THE HOUGH TRANSFORMATION OTHERWISE THE EFFICIENCY SUFFERS GREATLY 
-#       AS NOISY IMAGES DO NOT WORK AS WELL WITH HOUGH TRANSFORMATIONS]
+def filter(image, vertices):
+    mask = np.zeros_like(image)
+    if len(mask.shape)==2:
+        cv2.fillPoly(mask, vertices, 255)
+    else:
+        cv2.fillPoly(mask, vertices, (255,)*mask.shape[2]) # in case, the input image has a channel dimension        
+    return cv2.bitwise_and(image, mask)
 
+def select_region(image):
+    rows, cols = image.shape[:2]
+    pt_1  = [cols*0.05, rows*0.90]
+    pt_2 = [cols*0.05, rows*0.70]
+    pt_3 = [cols*0.30, rows*0.55]
+    pt_4 = [cols*0.6, rows*0.15]
+    pt_5 = [cols*0.90, rows*0.15] 
+    pt_6 = [cols*0.90, rows*0.90]
+    vertices = np.array([[pt_1, pt_2, pt_3, pt_4, pt_5, pt_6]], dtype=np.int32)
+    return filter(image, vertices)
+
+#[NOTE: THE EDGE DETECTION NEEDED TO BE DONE BEFORE THE HOUGH TRANSFORMATION OTHERWISE THE EFFICIENCY SUFFERS GREATLY.]
+#[NOTE: NOISY IMAGES DO NOT WORK AS WELL WITH HOUGH TRANSFORMATIONS]
 def hough_transformation(image):
-    return cv2.HoughLinesP(image, rho=0.1, theta=np.pi/10, threshold = 15, minLineLength=9, maxLineGap=4)
-
-def draw_hough_transformation(image, lines, color=[255, 0, 0], thickness=2):
-    datapoints = []
+    return cv2.HoughLinesP(image, rho=0.1, theta=np.pi/10, threshold = 15, minLineLength = 7, maxLineGap = 5) #[MLG WAS PREVIOUSLY 4]
+ 
+def draw_hough_transformation(image, lines, color = [255, 0, 0], thickness = 2):
     image = np.copy(image)
     cleaned = []
     for line in lines:
         for x1,y1,x2,y2 in line:
             if abs(y2-y1) <=1 and abs(x2-x1) >=25 and abs(x2-x1) <= 55:
                 cleaned.append((x1,y1,x2,y2))
-                print ((x1, x2))
                 cv2.line(image, (x1, y1), (x2, y2), color, thickness)
     return image
 
@@ -60,12 +85,12 @@ def parse_datapoints(lines):
     datapoints = []
     for line in lines:
         for x1,y1,x2,y2 in line:
-            datapoints.append((x1 + x2)/2)
+            average = decimal.Decimal((x1+x2)/2)
+            datapoints.append(average)
     return datapoints
 
 #[USE MEAN-SHIFT CLUSTERING AS NUMBER OF CLUSTERS DO NOT NEED TO BE KNOWN BEFORE-HAND]
-def find_clusters(lines):
-    print (sorted(lines))
+def find_clusters(datapoints):
     raw_lines = np.reshape(lines, (-1, 1))
     band = estimate_bandwidth(raw_lines, quantile=0.2, n_samples=100)
     ms = MeanShift(bandwidth = band, bin_seeding=True)
@@ -183,14 +208,23 @@ def assign(image, spot_dict, make_copy = True, color = [0, 0, 255], thickness = 
 def test_main():
     test_images = [plt.imread(path) for path in glob.glob('test_images/*.jpg')]
     edge_images = list(map(lambda image: filter_rgb_and_edge_detection(image), test_images))
-    display_images(edge_images)
-    list_of_lines = list(map(hough_transformation, edge_images))
+    roi_images = list(map(select_region, edge_images))
+    list_of_lines = list(map(hough_transformation, roi_images))
     line_images = []
     for image, lines in zip(test_images, list_of_lines):
       line_images.append(draw_hough_transformation(image, lines))    
-    datapoints = parse_datapoints(lines)
-    find_clusters(datapoints)
     display_images(line_images)
+
+
+
+
+
+
+
+
+
+    #datapoints = parse_datapoints(lines)
+    #find_clusters(datapoints)
 
     #################3
     # rect_images = []
