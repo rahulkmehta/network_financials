@@ -65,7 +65,7 @@ def parse_datapoints(lines):
 
 #[USE MEAN-SHIFT CLUSTERING AS NUMBER OF CLUSTERS DO NOT NEED TO BE KNOWN BEFORE-HAND]
 def find_clusters(lines):
-    #print (sorted(lines))
+    print (sorted(lines))
     raw_lines = np.reshape(lines, (-1, 1))
     band = estimate_bandwidth(raw_lines, quantile=0.2, n_samples=100)
     ms = MeanShift(bandwidth = band, bin_seeding=True)
@@ -183,7 +183,7 @@ def assign(image, spot_dict, make_copy = True, color = [0, 0, 255], thickness = 
 def test_main():
     test_images = [plt.imread(path) for path in glob.glob('test_images/*.jpg')]
     edge_images = list(map(lambda image: filter_rgb_and_edge_detection(image), test_images))
-    #display_images(edge_images)
+    display_images(edge_images)
     list_of_lines = list(map(hough_transformation, edge_images))
     line_images = []
     for image, lines in zip(test_images, list_of_lines):
