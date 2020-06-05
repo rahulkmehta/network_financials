@@ -12,9 +12,9 @@
 #[METHODOLOGY DRAWN FROM OPEN-SOURCES & PAPERS LISTED IN ACKNOWLEDGEMENTS. IMPROVEMENTS & CHANGES ALSO LISTED IN README.md]
 
 #[PACKAGE IMPORTS]
+
 from __future__ import division
 import cv2
-import pickle
 import decimal
 import operator
 import os, glob
@@ -22,7 +22,9 @@ import numpy as np
 from numpy import array, linspace
 import matplotlib.pyplot as plt
 from sklearn.cluster import MeanShift, estimate_bandwidth
-from scipy.signal import argrelextrema
+from scipy.signal import argrelextrema, argrelmax
+import math
+import pickle
 
 #[PRE-PROCESSING DIRECTIVES]
 cwd = os.getcwd()
@@ -88,13 +90,19 @@ def parse_datapoints(lines):
         for x1,y1,x2,y2 in line:
             average = decimal.Decimal((x1+x2)/2)
             datapoints.append(average)
-    for x in datapoints:
-        print (x)
     return datapoints
 
-#[FIND LOCAL MAXIMA WHICH SIGNAL A PARKING LANE]
+#[FIND LOCAL MAXIMA IN HISTOGRAM WHICH SIGNAL A PARKING LANE]
 def find_clusters(datapoints):
-    print()
+    #[HISTOGRAM CREATION]
+    npdata = np.array(datapoints)
+    w = 10
+    n = math.ceil((npdata.max() - npdata.min())/w)
+    figure = plt.hist(npdata, bins = n)
+    plt.show() #[FOR REDUNDANCY]
+
+    data = pickle.load(file("../network_financials/test1.pickle"))
+    hist = Data(data[0], data[1])
 
 
 def draw_hough_transformation_withxclustering(image, lines, color=[0, 0, 255], thickness=2, make_copy=True):
@@ -205,7 +213,7 @@ def test_main():
     line_images = []
     for image, lines in zip(test_images, list_of_lines):
         line_images.append(draw_hough_transformation(image, lines))  
-    display_images(line_images)  
+    #display_images(line_images)  
     datapoints = parse_datapoints(lines)
     find_clusters(datapoints)
 
