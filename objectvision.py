@@ -22,6 +22,7 @@ import numpy as np
 from numpy import array, linspace
 import matplotlib.pyplot as plt
 from sklearn.cluster import MeanShift, estimate_bandwidth
+from scipy.signal import argrelextrema
 
 #[PRE-PROCESSING DIRECTIVES]
 cwd = os.getcwd()
@@ -87,22 +88,13 @@ def parse_datapoints(lines):
         for x1,y1,x2,y2 in line:
             average = decimal.Decimal((x1+x2)/2)
             datapoints.append(average)
+    for x in datapoints:
+        print (x)
     return datapoints
 
-#[USE MEAN-SHIFT CLUSTERING AS NUMBER OF CLUSTERS DO NOT NEED TO BE KNOWN BEFORE-HAND]
+#[FIND LOCAL MAXIMA WHICH SIGNAL A PARKING LANE]
 def find_clusters(datapoints):
-    raw_lines = np.reshape(lines, (-1, 1))
-    band = estimate_bandwidth(raw_lines, quantile=0.2, n_samples=100)
-    ms = MeanShift(bandwidth = band, bin_seeding=True)
-    ms.fit(raw_lines)
-    labels = ms.labels_
-    cluster_centers = ms.cluster_centers_
-    print (cluster_centers)
-
-
-
-
-
+    print()
 
 
 def draw_hough_transformation_withxclustering(image, lines, color=[0, 0, 255], thickness=2, make_copy=True):
@@ -212,19 +204,10 @@ def test_main():
     list_of_lines = list(map(hough_transformation, roi_images))
     line_images = []
     for image, lines in zip(test_images, list_of_lines):
-      line_images.append(draw_hough_transformation(image, lines))    
-    display_images(line_images)
-
-
-
-
-
-
-
-
-
-    #datapoints = parse_datapoints(lines)
-    #find_clusters(datapoints)
+        line_images.append(draw_hough_transformation(image, lines))  
+    display_images(line_images)  
+    datapoints = parse_datapoints(lines)
+    find_clusters(datapoints)
 
     #################3
     # rect_images = []
