@@ -22,9 +22,10 @@ import numpy as np
 from numpy import array, linspace
 import matplotlib.pyplot as plt
 from sklearn.cluster import MeanShift, estimate_bandwidth
-from scipy.signal import argrelextrema, argrelmax
+from scipy.signal import argrelextrema, argrelmax, find_peaks
 import math
 import pickle
+import pylab as p
 
 #[PRE-PROCESSING DIRECTIVES]
 cwd = os.getcwd()
@@ -95,16 +96,23 @@ def parse_datapoints(lines):
 #[FIND LOCAL MAXIMA IN HISTOGRAM WHICH SIGNAL A PARKING LANE]
 def find_clusters(datapoints):
     #[HISTOGRAM CREATION]
-    npdata = np.array(datapoints)
+    npdata = np.array(datapoints, dtype=float)
     w = 10
     n = math.ceil((npdata.max() - npdata.min())/w)
-    figure = plt.hist(npdata, bins = n)
-    plt.show() #[FOR REDUNDANCY]
+    figure = np.histogram(npdata, bins = n)
+    hData = figure[0]
+    peaks = argrelextrema(hData, np.greater, order=3)
 
-    data = pickle.load(file("../network_financials/test1.pickle"))
-    hist = Data(data[0], data[1])
+    #[NOW THAT THE TOP HISTOGRAM VALUES HAVE BEEN FOUND, FIND THE X-VALUES]
+    xclusters = []
+    for val in peaks:
+        for item in val:
+            xclusters.append(figure[1][item])
 
-
+    #[RETURN VALUES]
+    return xclusters
+            
+    
 def draw_hough_transformation_withxclustering(image, lines, color=[0, 0, 255], thickness=2, make_copy=True):
     new_image = np.copy(image) # don't want to modify the original
     cleaned = []
@@ -213,9 +221,10 @@ def test_main():
     line_images = []
     for image, lines in zip(test_images, list_of_lines):
         line_images.append(draw_hough_transformation(image, lines))  
-    #display_images(line_images)  
     datapoints = parse_datapoints(lines)
-    find_clusters(datapoints)
+    x_clusters = find_clusters(datapoints)
+
+
 
     #################3
     # rect_images = []
