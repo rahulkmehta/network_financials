@@ -9,7 +9,7 @@
 #                                                                          #
 ############################################################################
 
-#[BROAD STROKES DRAWN FROM OPEN-SOURCES & PAPERS LISTED IN README.md. IMPROVEMENTS & CHANGES ALSO LISTED IN README.md]
+#[BROAD STROKES DRAWN FROM OPEN-SOURCES & PAPERS LISTED IN README.md. IMPROVEMENTS, CHANGES, AND METHODOLOGIES ALSO LISTED IN README.md]
 
 #[PACKAGE IMPORTS]
 from __future__ import division
@@ -232,5 +232,5 @@ def test_main():
 
     #[FINAL DISPLAY]
     display_images(rect_images)
-    
+
 test_main()
