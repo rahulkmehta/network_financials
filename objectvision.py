@@ -9,26 +9,25 @@
 #                                                                          #
 ############################################################################
 
-#[METHODOLOGY DRAWN FROM OPEN-SOURCES & PAPERS LISTED IN ACKNOWLEDGEMENTS. IMPROVEMENTS & CHANGES ALSO LISTED IN README.md]
+#[BROAD STROKES DRAWN FROM OPEN-SOURCES & PAPERS LISTED IN README.md. IMPROVEMENTS & CHANGES ALSO LISTED IN README.md]
 
 #[PACKAGE IMPORTS]
-
 from __future__ import division
 import cv2
+import math
+import pickle
 import decimal
 import operator
 import os, glob
-import numpy as np
-from numpy import array, linspace
-import matplotlib.pyplot as plt
-from sklearn.cluster import MeanShift, estimate_bandwidth
-from scipy.signal import argrelextrema, argrelmax, find_peaks
-import math
-import pickle
 import pylab as p
 import statistics
+import numpy as np
+import matplotlib.pyplot as plt
+from numpy import array, linspace
+from sklearn.cluster import MeanShift, estimate_bandwidth
+from scipy.signal import argrelextrema, argrelmax, find_peaks
 
-#[PRE-PROCESSING DIRECTIVES]
+#[PRE-SCRIPTING DIRECTIVES]
 cwd = os.getcwd()
 
 #[HELPER FUNCTION TO DISPLAY IMAGES BEFORE/AFTER PROCESSING]
@@ -46,19 +45,22 @@ def display_images(images, cmap = None):
     plt.tight_layout(pad = 0, h_pad = 0, w_pad = 0)
     plt.show()
 
+#[BINARY CONVERSION AND CANNY EDGE DETECTION]
 def filter_rgb_and_edge_detection(image, lt = 50, ht = 200): 
     grayImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     (thresh, blackAndWhiteImage) = cv2.threshold(grayImage, 137, 255, cv2.THRESH_BINARY)
     return cv2.Canny(blackAndWhiteImage, lt, ht)
 
+#[REGION OF INTEREST MASKING]
 def filter(image, vertices):
     mask = np.zeros_like(image)
-    if len(mask.shape)==2:
+    if len(mask.shape) == 2:
         cv2.fillPoly(mask, vertices, 255)
     else:
-        cv2.fillPoly(mask, vertices, (255,)*mask.shape[2]) # in case, the input image has a channel dimension        
+        cv2.fillPoly(mask, vertices, (255,) * mask.shape[2])      
     return cv2.bitwise_and(image, mask)
 
+#[HARD-CODING THE REGION OF INTEREST]
 def select_region(image):
     rows, cols = image.shape[:2]
     pt_1  = [cols*0.05, rows*0.90]
@@ -72,9 +74,12 @@ def select_region(image):
 
 #[NOTE: THE EDGE DETECTION NEEDED TO BE DONE BEFORE THE HOUGH TRANSFORMATION OTHERWISE THE EFFICIENCY SUFFERS GREATLY.]
 #[NOTE: NOISY IMAGES DO NOT WORK AS WELL WITH HOUGH TRANSFORMATIONS]
+
+#[PROBABILISTIC HOUGH TRANSFORMATION]
 def hough_transformation(image):
-    return cv2.HoughLinesP(image, rho=0.1, theta=np.pi/10, threshold = 15, minLineLength = 7, maxLineGap = 5) #[MLG WAS PREVIOUSLY 4]
+    return cv2.HoughLinesP(image, rho = 0.1, theta = np.pi/10, threshold = 15, minLineLength = 7, maxLineGap = 5)
  
+ #[DRAWING HOUGH TRANSFORMATION ON IMAGE]
 def draw_hough_transformation(image, lines, color = [255, 0, 0], thickness = 2):
     image = np.copy(image)
     cleaned = []
@@ -85,28 +90,29 @@ def draw_hough_transformation(image, lines, color = [255, 0, 0], thickness = 2):
                 cv2.line(image, (x1, y1), (x2, y2), color, thickness)
     return image
 
-#[COMPILE LIST OF LINE COORDINATES]
+#[COMPILING A USABLE LIST OF LINE COORDINATES]
 def parse_datapoints(lines):
     datapoints = []
     for line in lines:
         for x1,y1,x2,y2 in line:
-            average = decimal.Decimal((x1+x2)/2)
+            average = decimal.Decimal((x1 + x2)/2)
             datapoints.append(average)
     return datapoints
 
+#[COMPILING SECONDARY LIST WITH Y-COORDINATES AS WELL AS X-COORDINATES]
 def parse_xy(lines):
     datapoints = []
     for line in lines:
         for x1,y1,x2,y2 in line:
-            average = decimal.Decimal((x1+x2)/2)
+            average = decimal.Decimal((x1 + x2)/2)
             datapoints.append((average, y2))
     return datapoints
 
-#[FIND LOCAL MAXIMA IN HISTOGRAM WHICH SIGNAL A PARKING LANE]
+#[FIND LOCAL MAXIMA IN HISTOGRAM WHICH WOULD THEORETICALLY SIGNAL A PARKING LANE]
 def find_clusters(datapoints):
     #[HISTOGRAM CREATION]
     npdata = np.array(datapoints, dtype=float)
-    w = 10
+    w = 10 #[CHANGE THIS VALUE TO INCREASE/DECREASE THE SIZE OF BINS]
     n = math.ceil((npdata.max() - npdata.min())/w)
     figure = np.histogram(npdata, bins = n)
     hData = figure[0]
@@ -121,24 +127,28 @@ def find_clusters(datapoints):
     #[RETURN VALUES]
     return xclusters
             
+#[CREATE BOUNDING BOXES THAT WILL EVENTUALLY BE SPLIT INTO SMALLER BOXES (TO BE FED INTO R-CNN MODEL)]
 def create_bounding_boxes (xclusters, datapoints):
+    #[TAKING THE AVERAGE DISTANCE BETWEEN PEAKS AND THEN DIVIDING IT BY FOUR]
     difflist = []
     for i in range(len(xclusters)-1):
         difflist.append(xclusters[i+1]- xclusters[i])
     buffer = statistics.mean(difflist)/4
 
+    #[LOADING INTO MIN AND MAX Y VALUES FOR EACH X-CLUSTER]
     dictwithmaxandminy = {}
     for val in xclusters:
         dictwithmaxandminy[val] = []
-
     for val in xclusters:
         min_val = int(str(min(xy[1] for xy in sorted(datapoints) if val - 10 < xy[0] < val + 10)))
         max_val = int(str(max(xy[1] for xy in sorted(datapoints) if val - 10 < xy[0] < val + 10)))
         dictwithmaxandminy[val].append(min_val)
         dictwithmaxandminy[val].append(max_val)
     
+    #[RETURN DICTIONARY WTIH BUFFER]
     return dictwithmaxandminy, buffer
  
+ #[DRAW THE BOUNDING BOXES ON THE IMAGE]
 def draw_dict(image, dictionary, buff, color = [0, 0, 255], thickness = 2, make_copy = True):
     new_image = np.copy(image)
     for key, value in dictionary.items():
@@ -202,37 +212,25 @@ def test_main():
     test_images = [plt.imread(path) for path in glob.glob('test_images/*.jpg')]
     edge_images = list(map(lambda image: filter_rgb_and_edge_detection(image), test_images))
     roi_images = list(map(select_region, edge_images))
+
+    #[LIST OF LINES NOW CREATED]
     list_of_lines = list(map(hough_transformation, roi_images))
     line_images = []
     for image, lines in zip(test_images, list_of_lines):
         line_images.append(draw_hough_transformation(image, lines))  
-    datapoints = parse_datapoints(lines)
-    x_clusters = find_clusters(datapoints)
-    dpwithy = parse_xy(lines)
-    dictax, buff = create_bounding_boxes(x_clusters, dpwithy)
 
+    #[WITH DATAPOINTS]
+    datapoints = parse_datapoints(lines)
+    xclusters = find_clusters(datapoints)
+    dictionarywithycoords = parse_xy(lines)
+    dictwithminmax, gap = create_bounding_boxes(xclusters, dictionarywithycoords)
+
+    #[RECT IMAGES]
     rect_images = []
     for image in test_images:
-        rect_images.append(draw_dict(image, dictax, buff))
+        rect_images.append(draw_dict(image, dictwithminmax, gap))
 
+    #[FINAL DISPLAY]
     display_images(rect_images)
-
-    #################3
-    # rect_images = []
-    # rect_coords = []
-    # for image, lines in zip(test_images, list_of_lines):
-    #     new_image, rects = draw_hough_transformation_withxclustering(image, lines)
-    #     rect_images.append(new_image)
-    #     rect_coords.append(rects)    
-    # display_images(rect_images)
-    # delineated = []
-    # spot_pos = []
-    # for image, rects in zip(test_images, rect_coords):
-    #     new_image, spot_dict = isolate_spots(image, rects)
-    #     delineated.append(new_image)
-    #     spot_pos.append(spot_dict)
-    # final_spot_dict = spot_pos[1]
-    # marked_spot = list(map(assign(image=test_image[0],spot_dict=final_spot_dict), test_images))
-    # display_images(marked_spot)
-
+    
 test_main()
