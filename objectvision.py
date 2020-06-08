@@ -26,6 +26,7 @@ from scipy.signal import argrelextrema, argrelmax, find_peaks
 import math
 import pickle
 import pylab as p
+import statistics
 
 #[PRE-PROCESSING DIRECTIVES]
 cwd = os.getcwd()
@@ -93,6 +94,14 @@ def parse_datapoints(lines):
             datapoints.append(average)
     return datapoints
 
+def parse_xy(lines):
+    datapoints = []
+    for line in lines:
+        for x1,y1,x2,y2 in line:
+            average = decimal.Decimal((x1+x2)/2)
+            datapoints.append((average, y2))
+    return datapoints
+
 #[FIND LOCAL MAXIMA IN HISTOGRAM WHICH SIGNAL A PARKING LANE]
 def find_clusters(datapoints):
     #[HISTOGRAM CREATION]
@@ -112,7 +121,24 @@ def find_clusters(datapoints):
     #[RETURN VALUES]
     return xclusters
             
+def create_bounding_boxes (xclusters, datapoints):
+    difflist = []
+    for i in range(len(xclusters)-1):
+        difflist.append(xclusters[i+1]- xclusters[i])
+    buffer = statistics.mean(difflist)/12
+
+    dictwithmaxandminy = {}
+    for val in xclusters:
+        dictwithmaxandminy[val] = []
+
+    for val in xclusters:
+        min_val = int(str(min(xy[1] for xy in sorted(datapoints) if val - 10 < xy[0] < val + 10)))
+        max_val = int(str(max(xy[1] for xy in sorted(datapoints) if val - 10 < xy[0] < val + 10)))
+        dictwithmaxandminy[val].append(min_val)
+        dictwithmaxandminy[val].append(max_val)
     
+    return dictwithmaxandminy
+
 def draw_hough_transformation_withxclustering(image, lines, color=[0, 0, 255], thickness=2, make_copy=True):
     new_image = np.copy(image) # don't want to modify the original
     cleaned = []
@@ -223,8 +249,8 @@ def test_main():
         line_images.append(draw_hough_transformation(image, lines))  
     datapoints = parse_datapoints(lines)
     x_clusters = find_clusters(datapoints)
-
-
+    dpwithy = parse_xy(lines)
+    create_bounding_boxes(x_clusters, dpwithy)
 
     #################3
     # rect_images = []
