@@ -125,7 +125,7 @@ def create_bounding_boxes (xclusters, datapoints):
     difflist = []
     for i in range(len(xclusters)-1):
         difflist.append(xclusters[i+1]- xclusters[i])
-    buffer = statistics.mean(difflist)/12
+    buffer = statistics.mean(difflist)/4
 
     dictwithmaxandminy = {}
     for val in xclusters:
@@ -137,57 +137,16 @@ def create_bounding_boxes (xclusters, datapoints):
         dictwithmaxandminy[val].append(min_val)
         dictwithmaxandminy[val].append(max_val)
     
-    return dictwithmaxandminy
+    return dictwithmaxandminy, buffer
+ 
+def draw_dict(image, dictionary, buff, color = [0, 0, 255], thickness = 2, make_copy = True):
+    new_image = np.copy(image)
+    for key, value in dictionary.items():
+        tup_topLeft = (int(key)-int(buff), value[1])
+        tup_botRight = (int(key)+int(buff), value[0])
+        cv2.rectangle(new_image, tup_topLeft, tup_botRight,(0,255,0), 3)
+    return new_image
 
-def draw_hough_transformation_withxclustering(image, lines, color=[0, 0, 255], thickness=2, make_copy=True):
-    new_image = np.copy(image) # don't want to modify the original
-    cleaned = []
-    for line in lines:
-        for x1,y1,x2,y2 in line:
-            if abs(y2-y1) <=1 and abs(x2-x1) >=25 and abs(x2-x1) <= 55:
-                cleaned.append((x1,y1,x2,y2))
-    xlist = sorted(cleaned, key=operator.itemgetter(0,1))
-    clusters = {}
-    dIndex = 0
-    
-    #[NOTICE: FOR NOW, THIS IS A HARD-CODED VALUE -- MUST BE CHANGED TO MAKE ALGO ADAPTABLE TO DIFFERING SCOPES]
-    clust_dist = 13
-    #[END NOTICE]
-
-    for i in range(len(xlist)-1):
-        distance = abs(xlist[i+1][0]-xlist[i][0])
-        if distance <= clust_dist:
-            if not dIndex in clusters.keys(): 
-                clusters[dIndex] = []
-            clusters[dIndex].append(xlist[i])
-            clusters[dIndex].append(xlist[i+1])
-        else:
-            dIndex += 1
-    rects = {}
-    i = 0
-    for key in clusters:
-        all_list = clusters[key]
-        cleaned = list(set(all_list))
-        if len(cleaned) > 5:
-            cleaned = sorted(cleaned, key=lambda tup: tup[1])
-            avg_y1 = cleaned[0][1]
-            avg_y2 = cleaned[-1][1]
-            avg_x1 = 0
-            avg_x2 = 0
-            for tup in cleaned:
-                avg_x1 += tup[0]
-                avg_x2 += tup[2]
-            avg_x1 = avg_x1/len(cleaned)
-            avg_x2 = avg_x2/len(cleaned)
-            rects[i] = (avg_x1, avg_y1, avg_x2, avg_y2)
-            i += 1
-    print("NUM PARKING LANES: ", len(rects))
-    buff = 7
-    for key in rects:
-        tup_topLeft = (int(rects[key][0] - buff), int(rects[key][1]))
-        tup_botRight = (int(rects[key][2] + buff), int(rects[key][3]))
-        cv2.rectangle(new_image, tup_topLeft,tup_botRight,(0,255,0),3)
-    return new_image, rects
 
 def isolate_spots(image, rects, make_copy = True, color=[255, 0, 0], thickness=2, save = True):
     new_image = np.copy(image)
@@ -250,7 +209,13 @@ def test_main():
     datapoints = parse_datapoints(lines)
     x_clusters = find_clusters(datapoints)
     dpwithy = parse_xy(lines)
-    create_bounding_boxes(x_clusters, dpwithy)
+    dictax, buff = create_bounding_boxes(x_clusters, dpwithy)
+
+    rect_images = []
+    for image in test_images:
+        rect_images.append(draw_dict(image, dictax, buff))
+
+    display_images(rect_images)
 
     #################3
     # rect_images = []
