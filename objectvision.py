@@ -150,12 +150,14 @@ def create_bounding_boxes (xclusters, datapoints):
  
  #[DRAW THE BOUNDING BOXES ON THE IMAGE]
 def draw_dict(image, dictionary, buff, color = [0, 0, 255], thickness = 2, make_copy = True):
+    rect_coords = []
     new_image = np.copy(image)
     for key, value in dictionary.items():
         tup_topLeft = (int(key)-int(buff), value[1])
         tup_botRight = (int(key)+int(buff), value[0])
         cv2.rectangle(new_image, tup_topLeft, tup_botRight,(0,255,0), 3)
-    return new_image
+        rect_coords.append((tup_topLeft[0], tup_topLeft[1], tup_botRight[0], tup_botRight[1]))
+    return new_image, rect_coords
 
 
 def isolate_spots(image, rects, make_copy = True, color=[255, 0, 0], thickness=2, save = True):
@@ -227,8 +229,13 @@ def test_main():
 
     #[RECT IMAGES]
     rect_images = []
+    rect_coords = []
     for image in test_images:
-        rect_images.append(draw_dict(image, dictwithminmax, gap))
+        ri, rc = draw_dict(image, dictwithminmax, gap)
+        rect_images.append(ri)
+        rect_coords.append(rc)
+
+    print (rect_coords)
 
     #[FINAL DISPLAY]
     display_images(rect_images)
