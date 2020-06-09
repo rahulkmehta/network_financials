@@ -133,7 +133,7 @@ def create_bounding_boxes (xclusters, datapoints):
     difflist = []
     for i in range(len(xclusters)-1):
         difflist.append(xclusters[i+1]- xclusters[i])
-    buffer = statistics.mean(difflist)/4
+    buffer = statistics.mean(difflist)/3.8
 
     #[LOADING INTO MIN AND MAX Y VALUES FOR EACH X-CLUSTER]
     dictwithmaxandminy = {}
@@ -235,9 +235,6 @@ def test_main():
         rect_images.append(ri)
         rect_coords.append(rc)
 
-    print (rect_coords)
-
-    #[FINAL DISPLAY]
     display_images(rect_images)
 
 test_main()
