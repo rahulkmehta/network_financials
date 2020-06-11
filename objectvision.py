@@ -26,9 +26,19 @@ import matplotlib.pyplot as plt
 from numpy import array, linspace
 from sklearn.cluster import MeanShift, estimate_bandwidth
 from scipy.signal import argrelextrema, argrelmax, find_peaks
+from PIL import Image
+from keras.applications.imagenet_utils import preprocess_input
+from keras.models import load_model
+from keras.preprocessing import image
 
 #[PRE-SCRIPTING DIRECTIVES]
 cwd = os.getcwd()
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+top_model_weights_path = 'car1.h5'
+class_dictionary = {}
+class_dictionary[0] = 'empty'
+class_dictionary[1] = 'occupied'
+modelo = load_model(top_model_weights_path)
 
 #[HELPER FUNCTION TO DISPLAY IMAGES BEFORE/AFTER PROCESSING]
 def display_images(images, cmap = None):
@@ -159,56 +169,58 @@ def draw_dict(image, dictionary, buff, color = [0, 0, 255], thickness = 2, make_
         rect_coords.append((tup_topLeft[0], tup_topLeft[1], tup_botRight[0], tup_botRight[1]))
     return new_image, rect_coords
 
-
-def isolate_spots(image, rects, make_copy = True, color=[255, 0, 0], thickness=2, save = True):
-    new_image = np.copy(image)
+def draw_parking(rect_coords):
     gap = 15.5
     spot_dict = {}
     tot_spots = 0
-    adj_y1 = {0: 20, 1:-10, 2:0, 3:-11, 4:28, 5:5, 6:-15, 7:-15, 8:-10, 9:-30, 10:9, 11:-32}
-    adj_y2 = {0: 30, 1: 50, 2:15, 3:10, 4:-15, 5:15, 6:15, 7:-20, 8:15, 9:15, 10:0, 11:30}
-    adj_x1 = {0: -8, 1:-15, 2:-15, 3:-15, 4:-15, 5:-15, 6:-15, 7:-15, 8:-10, 9:-10, 10:-10, 11:0}
-    adj_x2 = {0: 0, 1: 15, 2:15, 3:15, 4:15, 5:15, 6:15, 7:15, 8:10, 9:10, 10:10, 11:0}
-    for key in rects:
-        tup = rects[key]
-        x1 = int(tup[0] + adj_x1[key])
-        x2 = int(tup[2] + adj_x2[key])
-        y1 = int(tup[1] + adj_y1[key])
-        y2 = int(tup[3] + adj_y2[key])
-        cv2.rectangle(new_image, (x1, y1),(x2,y2),(0,255,0),2)
-        num_splits = int(abs(y2-y1)//gap)
-        for i in range(0, num_splits+1):
-            y = int(y1 + i*gap)
-            cv2.line(new_image, (x1, y), (x2, y), color, thickness)
-        if key > 0 and key < len(rects) -1 :        
-            x = int((x1 + x2)/2)
-            cv2.line(new_image, (x, y1), (x, y2), color, thickness)
-        if key == 0 or key == (len(rects) -1):
-            tot_spots += num_splits +1
-        else:
-            tot_spots += 2*(num_splits +1)
-            
-        if key == 0 or key == (len(rects) -1):
-            for i in range(0, num_splits+1):
-                cur_len = len(spot_dict)
-                y = int(y1 + i*gap)
-                spot_dict[(x1, y, x2, y+gap)] = cur_len +1        
-        else:
-            for i in range(0, num_splits+1):
-                cur_len = len(spot_dict)
-                y = int(y1 + i*gap)
-                x = int((x1 + x2)/2)
-                spot_dict[(x1, y, x, y+gap)] = cur_len +1
-                spot_dict[(x, y, x2, y+gap)] = cur_len +2   
-    print("TOTAL: ", tot_spots, cur_len)
-    return new_image, spot_dict
+
+    for coord in rect_coords:
+        begy = coord[1]
+        endy = coord[3]
+        x1a = int(coord[0])
+        x1b = int((coord[2]-coord[0]) / 2) + x1a
+        x1c = int(coord[2])
+
+        while (begy > endy):
+            spot_dict[(x1a, begy, x1b, begy-gap)] = tot_spots
+            tot_spots += 1
+            spot_dict[(x1b, begy, x1c, begy-gap)] = tot_spots
+            tot_spots += 1
+            begy -= gap
+    return spot_dict
 
 def assign(image, spot_dict, make_copy = True, color = [0, 0, 255], thickness = 2):
     new_image = np.copy(image)
     for spot in spot_dict.keys():
         (x1, y1, x2, y2) = spot
-        cv2.rectangle(new_image, (int(x2), int(y2)), (int(x2), int(y2)), color, thickness)
+        cv2.rectangle(new_image, (int(spot[0]), int(spot[1])), (int(spot[2]), int(spot[3])), color, thickness)
     return new_image
+        
+def make_prediction(image, finmodel):
+    img = image/255.
+    image = np.expand_dims(img, axis=0)
+    class_predicted = finmodel.predict(image)
+    inID = np.argmax(class_predicted[0])
+    label = class_dictionary[inID]
+    return label
+
+def predict_on_image(image, spot_dict, model, make_copy=True, color = [0, 255, 0], alpha=0.5):
+    new_image = np.copy(image)
+    overlay = np.copy(image)
+    cnt_empty = 0
+    all_spots = 0
+    for spot in spot_dict.keys():
+        all_spots += 1
+        (x1, y1, x2, y2) = spot
+        (x1, y1, x2, y2) = (int(x1), int(y1), int(x2), int(y2))
+        spot_img = image[y2:y1, x1:x2]
+        spot_img = cv2.resize(spot_img, (48, 48)) 
+        label = make_prediction(spot_img, model)
+        if label == 'empty':
+            cnt_empty += 1
+    occupied = all_spots - cnt_empty
+    percentage = occupied/all_spots
+    print (percentage, "%")
 
 def test_main():
     test_images = [plt.imread(path) for path in glob.glob('test_images/*.jpg')]
@@ -235,6 +247,18 @@ def test_main():
         rect_images.append(ri)
         rect_coords.append(rc)
 
-    display_images(rect_images)
+    #[GIVEN THE RECT COORDINATES OF THE PARKING LANES]
+    spot_pos = []
+    for rc in rect_coords:
+        spot_dict = draw_parking(rc)
+        spot_pos.append(spot_dict)
+    final = []
+    final_spot_dict = spot_pos[1]
+    for image in test_images:
+        final.append(assign(image, final_spot_dict))
+
+    #[MAKE FINAL PREDICTION]
+    for image in test_images:
+        predict_on_image(image, spot_dict = final_spot_dict, model = modelo)
 
 test_main()
