@@ -73,6 +73,15 @@ def filter(image, vertices):
 #[HARD-CODING THE REGION OF INTEREST]
 def select_region(image):
     rows, cols = image.shape[:2]
+    #[FOR TEST IMAGE 3, TEST IMAGE 4CLEAR]
+    # pt_1  = [cols*0.05, rows*0.87]
+    # pt_2 = [cols*0.05, rows*0.05]
+    # pt_3 = [cols*0.95, rows*0.05]
+    # pt_4 = [cols*0.95, rows*0.95]
+    # pt_5 = [cols*0.80, rows*0.95] 
+    # pt_6 = [cols*0.70, rows*0.87]
+
+    #[FOR TEST IMAGE 1, TEST IMAGE 2]
     pt_1  = [cols*0.05, rows*0.90]
     pt_2 = [cols*0.05, rows*0.70]
     pt_3 = [cols*0.30, rows*0.55]
@@ -86,17 +95,25 @@ def select_region(image):
 #[NOTE: NOISY IMAGES DO NOT WORK AS WELL WITH HOUGH TRANSFORMATIONS]
 
 #[PROBABILISTIC HOUGH TRANSFORMATION]
-def hough_transformation(image):
-    return cv2.HoughLinesP(image, rho = 0.1, theta = np.pi/10, threshold = 15, minLineLength = 7, maxLineGap = 5)
- 
- #[DRAWING HOUGH TRANSFORMATION ON IMAGE]
+def hough_transformation(image): 
+    #[OLD VERSIONS]
+    #return cv2.HoughLinesP(image, rho = 0.1, theta = np.pi/10, threshold = 15, minLineLength = 7, maxLineGap = 5)
+
+    #[COMPROMISE BETWEEN DIFFERENT TYPES OF LOTS]
+    return cv2.HoughLinesP(image, rho = 0.75, theta = np.pi/180, threshold = 30, minLineLength = 10, maxLineGap = 5)
+
+
+#[DRAWING HOUGH TRANSFORMATION ON IMAGE FOR DEVELOPMENT PURPORSES]
 def draw_hough_transformation(image, lines, color = [255, 0, 0], thickness = 2):
     image = np.copy(image)
-    cleaned = []
     for line in lines:
         for x1,y1,x2,y2 in line:
-            if abs(y2-y1) <=1 and abs(x2-x1) >=25 and abs(x2-x1) <= 55:
-                cleaned.append((x1,y1,x2,y2))
+            #[OLD CONTINGENCY]
+            #if abs(y2-y1) <=1 and abs(x2-x1) >=25 and abs(x2-x1) <= 55:
+
+            #[FILTERS VERTICAL LINES THAT ARE PROBABLY DRAWN ERRONEOUSLY]
+            angle = np.arctan2(y2 - y1, x2 - x1) * 180. / np.pi
+            if abs(angle) < 80:
                 cv2.line(image, (x1, y1), (x2, y2), color, thickness)
     return image
 
@@ -125,6 +142,11 @@ def find_clusters(datapoints):
     w = 10 #[CHANGE THIS VALUE TO INCREASE/DECREASE THE SIZE OF BINS]
     n = math.ceil((npdata.max() - npdata.min())/w)
     figure = np.histogram(npdata, bins = n)
+
+    #[HISTOGRAM SUPPORT]
+    plt.hist(npdata, bins = n)
+    plt.show()
+
     hData = figure[0]
     peaks = argrelextrema(hData, np.greater, order=3)
 
@@ -169,6 +191,7 @@ def draw_dict(image, dictionary, buff, color = [0, 0, 255], thickness = 2, make_
         rect_coords.append((tup_topLeft[0], tup_topLeft[1], tup_botRight[0], tup_botRight[1]))
     return new_image, rect_coords
 
+#[FOR DEVELOPMENT PURPOSES, DRAWING THE SUB-BOUNDING BOXES]
 def draw_parking(rect_coords):
     gap = 15.5
     spot_dict = {}
@@ -189,13 +212,15 @@ def draw_parking(rect_coords):
             begy -= gap
     return spot_dict
 
+#[ASSIGN TO SPOT_DICT]
 def assign(image, spot_dict, make_copy = True, color = [0, 0, 255], thickness = 2):
     new_image = np.copy(image)
     for spot in spot_dict.keys():
         (x1, y1, x2, y2) = spot
         cv2.rectangle(new_image, (int(spot[0]), int(spot[1])), (int(spot[2]), int(spot[3])), color, thickness)
     return new_image
-        
+   
+#[MAKE THE PREDICTION OF RESIZED IMAGE]     
 def make_prediction(image, finmodel):
     img = image/255.
     image = np.expand_dims(img, axis=0)
@@ -204,6 +229,7 @@ def make_prediction(image, finmodel):
     label = class_dictionary[inID]
     return label
 
+#[PREDICTS ON IMAGE AND GETS FINAL PERCENTAGE]
 def predict_on_image(image, spot_dict, model, make_copy=True, color = [0, 255, 0], alpha=0.5):
     new_image = np.copy(image)
     overlay = np.copy(image)
@@ -222,8 +248,15 @@ def predict_on_image(image, spot_dict, model, make_copy=True, color = [0, 255, 0
     percentage = occupied/all_spots
     print (percentage, "%")
 
+#[DRVER]
 def test_main():
-    test_images = [plt.imread(path) for path in glob.glob('test_images/*.jpg')]
+    ti = [plt.imread(path) for path in glob.glob('test_images/*.jpg')]
+    test_images = []
+    for newimg in ti:
+        if len(newimg.shape) > 2 and newimg.shape[2] == 4:
+            newimg = cv2.cvtColor(newimg, cv2.COLOR_BGRA2BGR)
+        test_images.append(newimg)
+    
     edge_images = list(map(lambda image: filter_rgb_and_edge_detection(image), test_images))
     roi_images = list(map(select_region, edge_images))
 
@@ -243,22 +276,23 @@ def test_main():
     rect_images = []
     rect_coords = []
     for image in test_images:
-        ri, rc = draw_dict(image, dictwithminmax, gap)
-        rect_images.append(ri)
-        rect_coords.append(rc)
+         ri, rc = draw_dict(image, dictwithminmax, gap)
+         rect_images.append(ri)
+         rect_coords.append(rc)
 
     #[GIVEN THE RECT COORDINATES OF THE PARKING LANES]
     spot_pos = []
     for rc in rect_coords:
-        spot_dict = draw_parking(rc)
-        spot_pos.append(spot_dict)
+         spot_dict = draw_parking(rc)
+         spot_pos.append(spot_dict)
     final = []
     final_spot_dict = spot_pos[1]
     for image in test_images:
-        final.append(assign(image, final_spot_dict))
+         final.append(assign(image, final_spot_dict))
+    display_images(final)
 
     #[MAKE FINAL PREDICTION]
     for image in test_images:
-        predict_on_image(image, spot_dict = final_spot_dict, model = modelo)
+         predict_on_image(image, spot_dict = final_spot_dict, model = modelo)
 
 test_main()
