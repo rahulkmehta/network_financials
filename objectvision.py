@@ -19,7 +19,6 @@ import pickle
 import decimal
 import operator
 import os, glob
-import pylab as p
 import statistics
 import numpy as np
 import matplotlib.pyplot as plt
@@ -73,7 +72,7 @@ def filter(image, vertices):
 #[HARD-CODING THE REGION OF INTEREST]
 def select_region(image):
     rows, cols = image.shape[:2]
-    #[FOR TEST IMAGE 3, TEST IMAGE 4CLEAR]
+    #[FOR TEST IMAGE 3, TEST IMAGE 4]
     # pt_1  = [cols*0.05, rows*0.87]
     # pt_2 = [cols*0.05, rows*0.05]
     # pt_3 = [cols*0.95, rows*0.05]
@@ -292,7 +291,7 @@ def test_main():
     display_images(final)
 
     #[MAKE FINAL PREDICTION]
-    for image in test_images:
-         predict_on_image(image, spot_dict = final_spot_dict, model = modelo)
+    #for image in test_images:
+        #predict_on_image(image, spot_dict = final_spot_dict, model = modelo)
 
 test_main()
