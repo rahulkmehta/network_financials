@@ -9,7 +9,7 @@
 #                                                                          #
 ############################################################################
 
-#[PACKAGE IMPORTS]
+# [PACKAGE IMPORTS]
 import csv
 import requests
 import json
@@ -20,7 +20,9 @@ from bs4 import BeautifulSoup
 from boxsdk import OAuth2, Client
 import ast
 import pickle
+import random
 
+# [BOX API CREDENTIALS]
 auth = OAuth2(
     client_id = 'l1je8xajdp77h9f8eu2bs27w6a2c2kcf',
     client_secret = 'T1IFvFU4Pv6Dz6gDB8Lf8LujnpIxJsJr',
@@ -28,6 +30,7 @@ auth = OAuth2(
 )
 client = Client(auth)
 
+# [MANUAL INPUT OF DICT]
 year_dict = {'2019': ['al', 'ar', 'az', 'co', 'fl', 'ga', 'ia', 'id', 'il', 'ks', 'la', 'mn', 'mt', 'nd', 'nj', 'nv', 'ny', 'oh', 'ok', 'pa', 'sc', 'tx', 'wa', 'wy'],
  '2018': ['ca', 'ct', 'de', 'in', 'ky', 'ma', 'md', 'me', 'mi', 'mo', 'ms', 'mt', 'nc', 'nd', 'ne', 'nh', 'nm', 'or', 'ri', 'sd', 'tn', 'ut', 'va', 'vt', 'wi', 'wv'],
  '2017': ['al', 'ar', 'az', 'co', 'de', 'fl', 'ga', 'ia', 'id', 'il', 'ks', 'la', 'md', 'mn', 'mt', 'nd', 'nj', 'nv', 'ny', 'oh', 'ok', 'pa', 'sc', 'wa', 'wi', 'wy']}
@@ -120,6 +123,7 @@ def scrape_naip(c19, c18, c17):
 					finalbreakdown_withcountycrossref['2017'].append((item[0], item[1], item[2]))
 	return finalbreakdown_withcountycrossref
 
+# [POPULATES COUNTY DICTIONARY]
 def populate_county_dictionary():
 	county2019 = {}
 	for item in year_dict['2019']:
@@ -214,13 +218,26 @@ def populate_county_dictionary():
 	county2017['wa'] = list(range(1, 78, 2))
 	county2017['wi'] = list(range(1, 142, 2))
 	county2017['wy'] = list(range(1, 46, 2))
-
 	return county2019, county2018, county2017
 
+# [RANDOM SAMPLING]
+def rs(finalbeforers):
+	finalafter = {'2019': [], '2018': [], '2017': []}
+	for k,v in finalbeforers.items():
+		if k == '2019':
+			finalafter['2019'] = random.sample(finalbeforers[k], 100)
+		elif k == '2018':
+			finalafter['2018'] = random.sample(finalbeforers[k], 100)
+		else:
+			finalafter['2017'] = random.sample(finalbeforers[k], 100)
+	return (finalafter)
+
+# [DRIVER]
 def testmain():
 	c19, c18, c17 = populate_county_dictionary()
 	finalbeforers = scrape_naip(c19, c18, c17)
-	for k,v in finalbeforers.items():
-		print (len(v))
+	finalafterrs = rs(finalbeforers)
+	with open('randomlysampledstores.pickle', 'wb') as f:
+		pickle.dump(finalafterrs, f)
 
 testmain()
