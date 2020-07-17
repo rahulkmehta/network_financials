@@ -14,8 +14,6 @@ import pickle
 import requests
 import urllib
 
-API_KEY = 'AIzaSyCu96-phtTlLZegwMRBaWMGkqMXcVXJtO4'
-
 def loadpickle():
 	with open ('pickles/randomlysampledstores.pickle', 'rb') as f:
 		sampledstores = pickle.load(f)
