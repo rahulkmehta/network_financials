@@ -1,0 +1,4 @@
+1. Plug into Latitude, Longitude
+2. canvas = qgis.utils.iface.mapCanvas()
+3. canvas.zoomScale(5000)
+4. Export to JPEG
